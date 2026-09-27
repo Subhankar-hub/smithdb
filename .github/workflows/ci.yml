@@ -19,17 +19,31 @@ jobs:
           - smithdb-gcc-debug
           - smithdb-clang-asan
 
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 500M
+
     steps:
       - uses: actions/checkout@v5
 
       - name: Install toolchain
-        run: sudo apt-get update && sudo apt-get install -y ninja-build clang g++
+        run: sudo apt-get update && sudo apt-get install -y ninja-build clang g++ ccache
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-${{ matrix.preset }}-${{ github.sha }}
+          restore-keys: ccache-${{ matrix.preset }}-
 
       - name: Configure
         run: cmake --preset ${{ matrix.preset }} -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
 
       - name: Build
         run: cmake --build --preset ${{ matrix.preset }}
+
+      - name: ccache statistics
+        run: ccache --show-stats
 
       - name: Run tests
         run: ctest --preset ${{ matrix.preset }}
