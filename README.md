@@ -56,9 +56,12 @@ There is no SQL parser, query execution, WAL, transaction support, or concurrenc
 
 ## Build
 
-Requirements: a C++20 compiler (GCC or Clang), CMake 3.25 or newer, and Ninja. GoogleTest is
+Requirements: a C++20 compiler (Clang or GCC), CMake 3.25 or newer, and Ninja. GoogleTest is
 used from the system if CMake can find it; otherwise it is downloaded automatically at configure
 time.
+
+The recommended way to build is with the CMake presets described in
+[Development Toolchain](#development-toolchain). A plain configure also works:
 
 ```bash
 cmake -S . -B build -G Ninja                              # Debug (default)
@@ -68,7 +71,21 @@ cmake -S . -B build-release -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build-release
 ```
 
-Pass `-DSMITHDB_BUILD_TESTS=OFF` to skip building the tests.
+Select a compiler with the standard CMake variables, for example
+`-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++` or
+`-DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++`.
+
+CMake options:
+
+| Option                      | Default | Description                                         |
+|-----------------------------|---------|-----------------------------------------------------|
+| `SMITHDB_BUILD_TESTS`       | `ON`    | Build the unit tests                                |
+| `SMITHDB_ENABLE_SANITIZERS` | `OFF`   | AddressSanitizer + UndefinedBehaviorSanitizer       |
+| `SMITHDB_ENABLE_TSAN`       | `OFF`   | ThreadSanitizer (cannot be combined with ASan/UBSan) |
+| `SMITHDB_ENABLE_LTO`        | `OFF`   | Link-time optimization through CMake's IPO support  |
+| `SMITHDB_ENABLE_CLANG_TIDY` | `OFF`   | Run clang-tidy while compiling SmithDB targets      |
+
+Build types: `Debug` uses `-O0 -g`; `Release` uses `-O2 -DNDEBUG`.
 
 Build targets:
 
@@ -80,6 +97,15 @@ Build targets:
 | `smithdb_storage_benchmark` | Sequential page I/O timing                     |
 | `smithdb_tests`             | Unit tests                                     |
 
+Helper targets (never built by default):
+
+| Target            | Description                                                          |
+|-------------------|----------------------------------------------------------------------|
+| `smithdb-format`  | Run `clang-format -i` on `include/`, `src/`, `tests/`, `examples/`, `tools/` |
+| `smithdb-lint`    | Run `clang-tidy` on SmithDB sources using `compile_commands.json`    |
+| `smithdb-test`    | Build the tests and run `ctest --output-on-failure`                  |
+| `smithdb-example` | Build `smithdb_example`                                              |
+
 ```bash
 ./build/smithdb_example demo.db
 ./build/smithdb_inspect demo.db
@@ -89,6 +115,114 @@ Build targets:
 
 ```bash
 ctest --test-dir build --output-on-failure
+```
+
+## Development Toolchain
+
+| Role               | Tool          |
+|--------------------|---------------|
+| Primary compiler   | Clang/LLVM    |
+| Secondary compiler | GCC           |
+| Build system       | CMake         |
+| Generator          | Ninja         |
+| Debugger           | LLDB          |
+| Static analysis    | clang-tidy    |
+| Formatting         | clang-format  |
+
+The code is standard C++20 with no compiler-specific extensions and must build unchanged with
+both `clang++` and `g++`. The presets use the unversioned `clang`/`clang++` and `gcc`/`g++`
+executables found on `PATH`. Build directories are created under `build/<preset>`.
+
+### Debug development
+
+```bash
+cmake --preset smithdb-clang-debug
+cmake --build --preset smithdb-clang-debug
+ctest --preset smithdb-clang-debug
+```
+
+Debugging with LLDB:
+
+```bash
+lldb ./build/smithdb-clang-debug/smithdb_example -- demo.db
+```
+
+```text
+(lldb) breakpoint set --name main     # or: breakpoint set --file disk_manager.cpp --line 42
+(lldb) run
+(lldb) next                           # step over
+(lldb) step                           # step into
+(lldb) continue
+(lldb) frame variable                 # locals in the current frame
+(lldb) bt                             # backtrace
+```
+
+### Sanitizer development
+
+AddressSanitizer and UndefinedBehaviorSanitizer are applied to the library, executables, and tests:
+
+```bash
+cmake --preset smithdb-clang-asan
+cmake --build --preset smithdb-clang-asan
+ctest --preset smithdb-clang-asan
+```
+
+ThreadSanitizer is available through `-DSMITHDB_ENABLE_TSAN=ON` in a separate build directory. It
+becomes useful once SmithDB introduces concurrency; it cannot be enabled together with
+`SMITHDB_ENABLE_SANITIZERS`.
+
+### GCC portability validation
+
+```bash
+cmake --preset smithdb-gcc-debug
+cmake --build --preset smithdb-gcc-debug
+ctest --preset smithdb-gcc-debug
+```
+
+### Static analysis and formatting
+
+```bash
+cmake --build --preset smithdb-clang-debug --target smithdb-lint     # clang-tidy, uses .clang-tidy
+cmake --build --preset smithdb-clang-debug --target smithdb-format   # clang-format -i, uses .clang-format
+```
+
+Alternatively configure with `-DSMITHDB_ENABLE_CLANG_TIDY=ON` to run clang-tidy during every
+compile. Formatting never runs as part of an ordinary build.
+
+### LLVM IR inspection
+
+Generating IR and assembly is an optional manual workflow, not part of the build:
+
+```bash
+# LLVM IR
+clang++ -std=c++20 -O2 -Iinclude -S -emit-llvm src/storage/page.cpp -o page.ll
+
+# Assembly
+clang++ -std=c++20 -O2 -Iinclude -S src/storage/page.cpp -o page.s
+
+# Object files produced by a build
+llvm-objdump -d --demangle build/smithdb-clang-debug/CMakeFiles/smithdb.dir/src/storage/page.cpp.o
+llvm-readelf --sections --symbols build/smithdb-clang-debug/smithdb_example
+llvm-nm --demangle build/smithdb-clang-debug/libsmithdb.a
+```
+
+### Release and performance experiments
+
+```bash
+cmake --preset smithdb-clang-release
+cmake --build --preset smithdb-clang-release
+ctest --preset smithdb-clang-release
+```
+
+The Release configuration uses `-O2` and is portable across machines of the same architecture. Link-time
+optimization is available with `-DSMITHDB_ENABLE_LTO=ON`. Architecture-specific flags such as
+`-march=native` and `-mtune=native` are only for local performance experiments and should be
+passed explicitly in a separate build directory, for example:
+
+```bash
+cmake -S . -B build/native -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+  -DCMAKE_CXX_FLAGS="-march=native -mtune=native"
 ```
 
 ## Project Structure

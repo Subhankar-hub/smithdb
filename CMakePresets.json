@@ -1,0 +1,84 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 25,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "smithdb-base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}"
+    },
+    {
+      "name": "smithdb-clang",
+      "hidden": true,
+      "inherits": "smithdb-base",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++"
+      }
+    },
+    {
+      "name": "smithdb-gcc",
+      "hidden": true,
+      "inherits": "smithdb-base",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++"
+      }
+    },
+    {
+      "name": "smithdb-clang-debug",
+      "displayName": "Clang Debug",
+      "inherits": "smithdb-clang",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "smithdb-clang-asan",
+      "displayName": "Clang Debug with ASan/UBSan",
+      "inherits": "smithdb-clang",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "SMITHDB_ENABLE_SANITIZERS": "ON"
+      }
+    },
+    {
+      "name": "smithdb-clang-release",
+      "displayName": "Clang Release",
+      "inherits": "smithdb-clang",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "smithdb-gcc-debug",
+      "displayName": "GCC Debug",
+      "inherits": "smithdb-gcc",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "smithdb-clang-debug", "configurePreset": "smithdb-clang-debug" },
+    { "name": "smithdb-clang-asan", "configurePreset": "smithdb-clang-asan" },
+    { "name": "smithdb-clang-release", "configurePreset": "smithdb-clang-release" },
+    { "name": "smithdb-gcc-debug", "configurePreset": "smithdb-gcc-debug" }
+  ],
+  "testPresets": [
+    {
+      "name": "smithdb-test-base",
+      "hidden": true,
+      "output": { "outputOnFailure": true }
+    },
+    { "name": "smithdb-clang-debug", "inherits": "smithdb-test-base", "configurePreset": "smithdb-clang-debug" },
+    { "name": "smithdb-clang-asan", "inherits": "smithdb-test-base", "configurePreset": "smithdb-clang-asan" },
+    { "name": "smithdb-clang-release", "inherits": "smithdb-test-base", "configurePreset": "smithdb-clang-release" },
+    { "name": "smithdb-gcc-debug", "inherits": "smithdb-test-base", "configurePreset": "smithdb-gcc-debug" }
+  ]
+}
