@@ -84,6 +84,7 @@ CMake options:
 | `SMITHDB_ENABLE_TSAN`       | `OFF`   | ThreadSanitizer (cannot be combined with ASan/UBSan) |
 | `SMITHDB_ENABLE_LTO`        | `OFF`   | Link-time optimization through CMake's IPO support  |
 | `SMITHDB_ENABLE_CLANG_TIDY` | `OFF`   | Run clang-tidy while compiling SmithDB targets      |
+| `SMITHDB_ENABLE_CCACHE`     | `ON`    | Use ccache as the compiler launcher if it is installed |
 
 Build types: `Debug` uses `-O0 -g`; `Release` uses `-O2 -DNDEBUG`.
 

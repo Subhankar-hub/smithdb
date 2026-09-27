@@ -24,6 +24,19 @@ option(SMITHDB_ENABLE_SANITIZERS "Build SmithDB with AddressSanitizer and Undefi
 option(SMITHDB_ENABLE_TSAN "Build SmithDB with ThreadSanitizer" OFF)
 option(SMITHDB_ENABLE_LTO "Build SmithDB with link-time optimization" OFF)
 option(SMITHDB_ENABLE_CLANG_TIDY "Run clang-tidy while compiling SmithDB targets" OFF)
+option(SMITHDB_ENABLE_CCACHE "Use ccache as the compiler launcher when it is installed" ON)
+
+# An explicit CMAKE_<LANG>_COMPILER_LAUNCHER from the user takes precedence.
+if(SMITHDB_ENABLE_CCACHE AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
+    find_program(SMITHDB_CCACHE_EXE NAMES ccache)
+    if(SMITHDB_CCACHE_EXE)
+        message(STATUS "Using ccache: ${SMITHDB_CCACHE_EXE}")
+        set(CMAKE_C_COMPILER_LAUNCHER ${SMITHDB_CCACHE_EXE})
+        set(CMAKE_CXX_COMPILER_LAUNCHER ${SMITHDB_CCACHE_EXE})
+    else()
+        message(STATUS "ccache not found; building without a compiler cache")
+    endif()
+endif()
 
 # Warning flags are applied only to SmithDB's own targets, not to third-party code.
 add_library(smithdb_warnings INTERFACE)
